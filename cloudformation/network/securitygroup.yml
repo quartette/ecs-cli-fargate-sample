@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Fargate sample security group
+
+# https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+Resources:
+  DefaultSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: fargate-sample-sg
+      GroupDescription: fargate sample
+      VpcId: {'Fn::ImportValue': !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-vpc']]}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: fargate-sample-sg
+
+Outputs:
+  DefaultSecurityGroup:
+    Description: default security group
+    Value: !Ref DefaultSecurityGroup
+    Export:
+      Name: !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-default-sg']]

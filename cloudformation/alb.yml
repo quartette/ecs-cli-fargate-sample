@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Fargate ALB
+
+Parameters:
+  EnvType:
+    Description: Environment type.
+    Default: dev
+    Type: String
+    AllowedValues:
+      - dev
+      - stg
+      - prod
+  ACMArn:
+    Description: SSL server certificate
+    Default: arn:aws:acm:ap-northeast-1:000000000000:certificate/11111111-0000-1111-2222-aaaaaaaaaaaa
+    Type: String
+
+Resources:
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join ['-', ['fargate-sample', !Ref EnvType, 'tg']]
+      VpcId: {'Fn::ImportValue': !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-vpc']]}
+      # HealthCheck
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: '/healthcheck.html'
+      HealthCheckPort: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200
+      # Routing
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      TargetGroupAttributes:
+        # ターゲットの登録解除までの待機時間
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      Tags:
+        - Key: Name
+          Value: !Join ['-', ['fargate-sample', !Ref EnvType, 'tg']]
+        - Key: Env
+          Value: !Ref EnvType
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Name: !Join ['-', ['fargate-sample', !Ref EnvType, 'alb']]
+      SecurityGroups: !Split [',', {'Fn::ImportValue': !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-default-sg']]}]
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      Subnets: !Split [',', {'Fn::ImportValue': !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-subnets']]}]
+      # MEMO
+      # https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html
+      # https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/application/application-load-balancers.html#load-balancer-attributes
+      LoadBalancerAttributes:
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket
+          Value: !Ref AccessLogBucket
+        - Key: access_logs.s3.prefix
+          Value: !Ref EnvType
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+        - Key: routing.http2.enabled
+          Value: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', ['fargate-sample', !Ref EnvType, 'alb']]
+        - Key: Env
+          Value: !Ref EnvType
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      # TODO http -> https のリダイレクト。現時点ではcloudformationで対応してない。
+      # https://aws.amazon.com/jp/about-aws/whats-new/2018/07/elastic-load-balancing-announces-support-for-redirects-and-fixed-responses-for-application-load-balancer/
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref ACMArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 443
+      Protocol: HTTPS
+      # http://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/application/create-https-listener.html
+      SslPolicy: 'ELBSecurityPolicy-2016-08'
+  # アクセスログ格納用S3バケット
+  # https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/classic/enable-access-logs.html
+  AccessLogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'fargate-sample-alb', !Ref EnvType, 'logs']]
+  AccessLogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AccessLogBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: 582318560864
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Join ['', ['arn:aws:s3:::', !Ref AccessLogBucket, '/', !Ref EnvType, '/AWSLogs/', 'Fn::Sub':'${AWS::AccountId}', '/*']]

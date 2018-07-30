@@ -1,0 +1,13 @@
+version: '3'
+services:
+  frontend:
+    environment:
+      - APP_ENV=dev
+    labels:
+      - Env=dev
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: "frontend"
+        awslogs-region: "ap-northeast-1"
+        awslogs-stream-prefix: "dev"

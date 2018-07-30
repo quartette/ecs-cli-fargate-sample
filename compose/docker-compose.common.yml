@@ -1,0 +1,14 @@
+version: '3'
+services:
+  frontend:
+    image: nginx:mainline-alpine
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 65536
+        hard: 65536
+    command:
+      /bin/sh -c
+        "nginx -g 'daemon off;'"
+    ports:
+      - "80:80"

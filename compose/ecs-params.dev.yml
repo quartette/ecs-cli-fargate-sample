@@ -1,0 +1,24 @@
+version: 1
+task_definition:
+  ecs_network_mode: awsvpc
+  # Amazon ECS タスク実行 IAM ロール
+  # https://docs.aws.amazon.com/ja_jp/AmazonECS/latest/developerguide/task_execution_IAM_role.html
+  task_execution_role: ecsTaskExecutionRole
+  task_size:
+    cpu_limit: 256
+    mem_limit: 512
+  services:
+    frontend:
+      cpu_shares: 256
+      mem_limit: 512
+      mem_reservation: 512
+      essential: true
+run_params:
+  network_configuration:
+    awsvpc_configuration:
+      subnets:
+        - subnet-xxxxxxxx
+        - subnet-zzzzzzzz
+      security_groups:
+        - sg-ssssssss
+      assign_public_ip: ENABLED
