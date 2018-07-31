@@ -23,7 +23,7 @@ Resources:
       VpcId: {'Fn::ImportValue': !Join ['-', ['Fn::Sub':'${AWS::AccountId}', 'Fn::Sub':'${AWS::Region}', 'test-vpc']]}
       # HealthCheck
       HealthCheckIntervalSeconds: 30
-      HealthCheckPath: '/healthcheck.html'
+      HealthCheckPath: '/'
       HealthCheckPort: 80
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
